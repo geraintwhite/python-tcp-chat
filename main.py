@@ -84,7 +84,7 @@ class Client(Thread):
         while self.running:
             try:
                 data = json.loads(self.conn.recv(self.size).decode())
-            except OSError:
+            except:
                 data = ''
             if not data or data['type'] == 'close':
                 print('Server closed')
