@@ -4,13 +4,11 @@ import sys
 import json
 
 
-class Server(Thread):
+class Server():
     def __init__(self, host='', port=1337):
-        super().__init__()
         self.host = host
         self.port = port
         self.backlog = 5
-        self.size = 1024
         self.server = None
         self.threads = []
 
@@ -19,18 +17,19 @@ class Server(Thread):
             self.server = socket.socket()
             self.server.bind((self.host, self.port))
             self.server.listen(self.backlog)
+            self.server.setblocking(0)
         except socket.error:
             if self.server:
                 self.server.close()
             sys.exit('Could not open socket')
         print('Server running on port', self.port)
 
-    def run(self):
+    def start(self):
         self.open_socket()
         self.running = True
         while self.running:
             try:
-                c = Connection(self, *self.server.accept())
+                c = Connection(self.server, *self.server.accept())
                 c.start()
                 self.threads.append(c)
                 print('Connection from', c.addr)
@@ -60,9 +59,8 @@ class Server(Thread):
         sys.exit()
 
 
-class Client(Thread):
+class Client():
     def __init__(self, host, port):
-        super().__init__()
         self.host = host
         self.port = port
         self.size = 1024
@@ -101,16 +99,16 @@ class Client(Thread):
 
 
 class Connection(Thread):
-    def __init__(self, server, client, addr):
+    def __init__(self, conn):
         super().__init__()
-        self.server = server
-        self.client = client
-        self.addr = addr
+        self.conn = conn
         self.size = 1024
+        self.running = False
 
     def run(self):
-        running = True
-        while running:
+        self.running = True
+        while self.running:
+            data = self.conn.recv(self.size).decode()
             try:
                 data = json.loads(self.client.recv(self.size).decode())['data']
             except:
@@ -122,10 +120,13 @@ class Connection(Thread):
                 print(msg)
             else:
                 self.client.close()
-                running = False
                 print(self.addr, 'disconnected')
                 self.server.broadcast('{} has left the server'
                     .format(self.addr))
+
+    def terminate(self):
+        self.running = False
+        self.conn.close()
 
 
 if __name__ == '__main__':
@@ -133,20 +134,10 @@ if __name__ == '__main__':
         if sys.argv[1] == '-s':
             s = Server()
             s.start()
-            input()
-            s.terminate()
 
         elif sys.argv[2]:
-            c, s = Client(sys.argv[1], int(sys.argv[2])), True
+            c = Client(sys.argv[1], int(sys.argv[2]))
             c.start()
-            while s:
-                s = input()
-                try:
-                    c.conn.send(
-                        json.dumps({'type': 'msg', 'data': s}).encode())
-                except:
-                    pass
-            c.terminate()
 
     except IndexError:
         print('Usage: python {} [-s | addr port] '.format(__file__))
