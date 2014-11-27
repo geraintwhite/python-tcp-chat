@@ -35,7 +35,7 @@ class Server(Thread):
                 self.threads.append(c)
                 print('Connection from', c.addr)
                 self.broadcast('{} has joined the server'.format(c.addr), c)
-            except ConnectionAbortedError:
+            except socket.error:
                 print ('Connection aborted')
 
     def broadcast(self, data, client=None):
